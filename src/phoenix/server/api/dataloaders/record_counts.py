@@ -1,3 +1,7 @@
+from typing import Optional, Tuple
+
+from phoenix.server.api.input_types.TimeRange import TimeRange
+from typing_extensions import TypeAlias
 from collections import defaultdict
 from datetime import datetime
 from typing import (
@@ -39,9 +43,10 @@ DEFAULT_VALUE: Result = 0
 
 def _cache_key_fn(key: Key) -> Tuple[Segment, Param]:
     kind, project_rowid, time_range, filter_condition = key
-    interval = (
-        (time_range.start, time_range.end) if isinstance(time_range, TimeRange) else (None, None)
-    )
+    if isinstance(time_range, TimeRange):
+        interval = (time_range.start, time_range.end)
+    else:
+        interval = (None, None)
     return (kind, interval, filter_condition), project_rowid
 
 
