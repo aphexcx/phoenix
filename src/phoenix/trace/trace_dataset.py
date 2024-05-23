@@ -1,3 +1,4 @@
+from typing import Any, List
 import json
 from datetime import datetime
 from pathlib import Path
@@ -65,18 +66,16 @@ def normalize_dataframe(dataframe: DataFrame) -> "DataFrame":
 
 def _delete_empty_document_metadata(documents: Any) -> Any:
     """
-    Removes ambiguous and empty dicts from the documents list so the is object
-    serializable to parquet
+    Removes ambiguous and empty dicts from the documents list so the object is
+    serializable to parquet.
     """
-    # If the documents is a list, iterate over them, check that the metadata is
-    # a dict, see if it is empty, and if it's empty, delete the metadata
     if isinstance(documents, list):
-        # Make a shallow copy of the keys
-        documents = list(map(dict, documents))
         for document in documents:
-            metadata = document.get(DOCUMENT_METADATA)
-            if isinstance(metadata, dict) and not metadata:
-                # Delete the metadata object since empty dicts are not serializable
+            if (
+                DOCUMENT_METADATA in document
+                and isinstance(document[DOCUMENT_METADATA], dict)
+                and not document[DOCUMENT_METADATA]
+            ):
                 del document[DOCUMENT_METADATA]
     return documents
 
@@ -280,7 +279,9 @@ class TraceDataset:
         """
         if not isinstance(id, UUID):
             id = UUID(id)
-        path = Path(directory or TRACE_DATASET_DIR) / TRACE_DATASET_PARQUET_FILE_NAME.format(id=id)
+        path = Path(
+            directory or TRACE_DATASET_DIR
+        ) / TRACE_DATASET_PARQUET_FILE_NAME.format(id=id)
         schema = parquet.read_schema(path)
         dataset_id, dataset_name, eval_ids = _parse_schema_metadata(schema)
         if id != dataset_id:
@@ -346,7 +347,9 @@ def _parse_schema_metadata(schema: Schema) -> Tuple[UUID, str, List[UUID]]:
         arize_metadata = json.loads(metadata[b"arize"])
         dataset_id = UUID(arize_metadata["dataset_id"])
         if not isinstance(dataset_name := arize_metadata["dataset_name"], str):
-            raise ValueError("Arize metadata must contain a dataset_name key with string value")
+            raise ValueError(
+                "Arize metadata must contain a dataset_name key with string value"
+            )
         eval_ids = [UUID(eval_id) for eval_id in arize_metadata["eval_ids"]]
         return dataset_id, dataset_name, eval_ids
     except Exception as err:
