@@ -25,7 +25,9 @@ class DocumentEvaluationSummary:
         self.evaluation_name = evaluation_name
         self.metrics_collection = pd.Series(metrics_collection, dtype=object)
         self._cached_average_ndcg_results: Dict[Optional[int], Tuple[float, int]] = {}
-        self._cached_average_precision_results: Dict[Optional[int], Tuple[float, int]] = {}
+        self._cached_average_precision_results: Dict[
+            Optional[int], Tuple[float, int]
+        ] = {}
 
     @strawberry.field
     def average_ndcg(self, k: Optional[int] = UNSET) -> Optional[float]:
@@ -68,9 +70,12 @@ class DocumentEvaluationSummary:
         return count
 
     def _average_ndcg(self, k: Optional[int] = None) -> Tuple[float, int]:
-        if (result := self._cached_average_ndcg_results.get(k)) is not None:
-            return result
-        values = self.metrics_collection.apply(lambda m: m.ndcg(k))
+        cached_result = self._cached_average_ndcg_results.get(k)
+        if cached_result is not None:
+            return cached_result
+
+        # Using pandas `map` function for better performance instead of `apply` with a lambda
+        values = self.metrics_collection.map(lambda m: m.ndcg(k))
         result = (values.mean(), values.count())
         self._cached_average_ndcg_results[k] = result
         return result
@@ -92,3 +97,19 @@ class DocumentEvaluationSummary:
     def _average_hit(self) -> Tuple[float, int]:
         values = self.metrics_collection.apply(lambda m: m.hit())
         return values.mean(), values.count()
+
+    def _average_ndcg(self, k: Optional[int] = None) -> Tuple[float, int]:
+        cached_result = self._cached_average_ndcg_results.get(k)
+        if cached_result is not None:
+            return cached_result
+
+        # Using pandas `map` function for better performance instead of `apply` with a lambda
+        values = self.metrics_collection.map(lambda m: m.ndcg(k))
+        result = (values.mean(), values.count())
+        self._cached_average_ndcg_results[k] = result
+        return result
+
+    @strawberry.field
+    def average_ndcg(self, k: Optional[int] = UNSET) -> Optional[float]:
+        value, _ = self._average_ndcg(None if k is UNSET else k)
+        return value if math.isfinite(value) else None
