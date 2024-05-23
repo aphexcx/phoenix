@@ -2,6 +2,7 @@ import math
 from functools import cached_property
 from typing import Any, Dict, Iterable, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import strawberry
 from strawberry import UNSET, Private
@@ -25,7 +26,9 @@ class DocumentEvaluationSummary:
         self.evaluation_name = evaluation_name
         self.metrics_collection = pd.Series(metrics_collection, dtype=object)
         self._cached_average_ndcg_results: Dict[Optional[int], Tuple[float, int]] = {}
-        self._cached_average_precision_results: Dict[Optional[int], Tuple[float, int]] = {}
+        self._cached_average_precision_results: Dict[
+            Optional[int], Tuple[float, int]
+        ] = {}
 
     @strawberry.field
     def average_ndcg(self, k: Optional[int] = UNSET) -> Optional[float]:
@@ -90,5 +93,23 @@ class DocumentEvaluationSummary:
 
     @cached_property
     def _average_hit(self) -> Tuple[float, int]:
-        values = self.metrics_collection.apply(lambda m: m.hit())
-        return values.mean(), values.count()
+        # Use list comprehension to compute hits
+        hits = [m.hit() for m in self.metrics_collection]
+        hit_array = np.array(hits, dtype=float)
+        mean_hit = np.mean(hit_array)
+        count_hit = hit_array.size
+        return mean_hit, count_hit
+
+    @cached_property
+    def _average_hit(self) -> Tuple[float, int]:
+        # Use list comprehension to compute hits
+        hits = [m.hit() for m in self.metrics_collection]
+        hit_array = np.array(hits, dtype=float)
+        mean_hit = np.mean(hit_array)
+        count_hit = hit_array.size
+        return mean_hit, count_hit
+
+    @strawberry.field
+    def hit_rate(self) -> Optional[float]:
+        value, _ = self._average_hit
+        return value if math.isfinite(value) else None
