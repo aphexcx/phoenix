@@ -1,3 +1,7 @@
+from datetime import datetime
+from typing import Any, Mapping
+
+import phoenix.trace.schemas as trace_schema
 import json
 from datetime import datetime
 from enum import Enum
@@ -70,7 +74,11 @@ class SpanIOValue:
         description="Truncate value up to `chars` characters, appending '...' if truncated.",
     )  # type: ignore
     def truncated_value(self, chars: int = 100) -> str:
-        return f"{self.value[: max(0, chars - 3)]}..." if len(self.value) > chars else self.value
+        return (
+            f"{self.value[: max(0, chars - 3)]}..."
+            if len(self.value) > chars
+            else self.value
+        )
 
 
 @strawberry.enum
@@ -96,7 +104,7 @@ class SpanEvent:
     ) -> "SpanEvent":
         return SpanEvent(
             name=event["name"],
-            message=cast(str, event["attributes"].get(trace_schema.EXCEPTION_MESSAGE) or ""),
+            message=event["attributes"].get(trace_schema.EXCEPTION_MESSAGE, ""),
             timestamp=datetime.fromisoformat(event["timestamp"]),
         )
 
@@ -160,7 +168,9 @@ class Span(Node):
         "a list, and each evaluation is identified by its document's (zero-based) "
         "index in that list."
     )  # type: ignore
-    async def document_evaluations(self, info: Info[Context, None]) -> List[DocumentEvaluation]:
+    async def document_evaluations(
+        self, info: Info[Context, None]
+    ) -> List[DocumentEvaluation]:
         return await info.context.data_loaders.document_evaluations.load(self.id_attr)
 
     @strawberry.field(
@@ -192,9 +202,13 @@ class Span(Node):
 def to_gql_span(span: models.Span) -> Span:
     events: List[SpanEvent] = list(map(SpanEvent.from_dict, span.events))
     input_value = cast(Optional[str], get_attribute_value(span.attributes, INPUT_VALUE))
-    output_value = cast(Optional[str], get_attribute_value(span.attributes, OUTPUT_VALUE))
+    output_value = cast(
+        Optional[str], get_attribute_value(span.attributes, OUTPUT_VALUE)
+    )
     retrieval_documents = get_attribute_value(span.attributes, RETRIEVAL_DOCUMENTS)
-    num_documents = len(retrieval_documents) if isinstance(retrieval_documents, Sized) else None
+    num_documents = (
+        len(retrieval_documents) if isinstance(retrieval_documents, Sized) else None
+    )
     return Span(
         id_attr=span.id,
         name=span.name,
@@ -209,8 +223,12 @@ def to_gql_span(span: models.Span) -> Span:
             trace_id=cast(ID, span.trace.trace_id),
             span_id=cast(ID, span.span_id),
         ),
-        attributes=json.dumps(_hide_embedding_vectors(span.attributes), cls=_JSONEncoder),
-        metadata=_convert_metadata_to_string(get_attribute_value(span.attributes, METADATA)),
+        attributes=json.dumps(
+            _hide_embedding_vectors(span.attributes), cls=_JSONEncoder
+        ),
+        metadata=_convert_metadata_to_string(
+            get_attribute_value(span.attributes, METADATA)
+        ),
         num_documents=num_documents,
         token_count_total=cast(
             Optional[int],
@@ -236,7 +254,9 @@ def to_gql_span(span: models.Span) -> Span:
         events=events,
         input=(
             SpanIOValue(
-                mime_type=MimeType(get_attribute_value(span.attributes, INPUT_MIME_TYPE)),
+                mime_type=MimeType(
+                    get_attribute_value(span.attributes, INPUT_MIME_TYPE)
+                ),
                 value=input_value,
             )
             if input_value is not None
@@ -244,7 +264,9 @@ def to_gql_span(span: models.Span) -> Span:
         ),
         output=(
             SpanIOValue(
-                mime_type=MimeType(get_attribute_value(span.attributes, OUTPUT_MIME_TYPE)),
+                mime_type=MimeType(
+                    get_attribute_value(span.attributes, OUTPUT_MIME_TYPE)
+                ),
                 value=output_value,
             )
             if output_value is not None
