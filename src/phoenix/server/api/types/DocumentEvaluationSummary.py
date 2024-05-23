@@ -2,6 +2,7 @@ import math
 from functools import cached_property
 from typing import Any, Dict, Iterable, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import strawberry
 from strawberry import UNSET, Private
@@ -25,7 +26,9 @@ class DocumentEvaluationSummary:
         self.evaluation_name = evaluation_name
         self.metrics_collection = pd.Series(metrics_collection, dtype=object)
         self._cached_average_ndcg_results: Dict[Optional[int], Tuple[float, int]] = {}
-        self._cached_average_precision_results: Dict[Optional[int], Tuple[float, int]] = {}
+        self._cached_average_precision_results: Dict[
+            Optional[int], Tuple[float, int]
+        ] = {}
 
     @strawberry.field
     def average_ndcg(self, k: Optional[int] = UNSET) -> Optional[float]:
@@ -78,8 +81,15 @@ class DocumentEvaluationSummary:
     def _average_precision(self, k: Optional[int] = None) -> Tuple[float, int]:
         if (result := self._cached_average_precision_results.get(k)) is not None:
             return result
-        values = self.metrics_collection.apply(lambda m: m.precision(k))
-        result = (values.mean(), values.count())
+
+        # Use list comprehension instead of pd.Series.apply
+        values = np.array([m.precision(k) for m in self.metrics_collection])
+        finite_values = values[np.isfinite(values)]
+
+        result = (
+            finite_values.mean() if len(finite_values) > 0 else float("nan"),
+            len(finite_values),
+        )
         self._cached_average_precision_results[k] = result
         return result
 
@@ -92,3 +102,23 @@ class DocumentEvaluationSummary:
     def _average_hit(self) -> Tuple[float, int]:
         values = self.metrics_collection.apply(lambda m: m.hit())
         return values.mean(), values.count()
+
+    def _average_precision(self, k: Optional[int] = None) -> Tuple[float, int]:
+        if (result := self._cached_average_precision_results.get(k)) is not None:
+            return result
+
+        # Use list comprehension instead of pd.Series.apply
+        values = np.array([m.precision(k) for m in self.metrics_collection])
+        finite_values = values[np.isfinite(values)]
+
+        result = (
+            finite_values.mean() if len(finite_values) > 0 else float("nan"),
+            len(finite_values),
+        )
+        self._cached_average_precision_results[k] = result
+        return result
+
+    @strawberry.field
+    def average_precision(self, k: Optional[int] = UNSET) -> Optional[float]:
+        value, _ = self._average_precision(None if k is UNSET else k)
+        return value if math.isfinite(value) else None
