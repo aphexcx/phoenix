@@ -61,4 +61,4 @@ def span_to_json(span: Span) -> str:
 
 
 def spans_to_jsonl(spans: List[Span]) -> str:
-    return "\n".join(span_to_json(span) for span in spans)
+    return "\n".join(map(span_to_json, spans))
