@@ -69,14 +69,14 @@ def get_pids_path() -> Path:
     This directory is used to track any currently running instances of Arize Phoenix
     on the host machine. The directory will be created if it does not exist.
     """
-    path = _get_temp_path() / "pids"
+    path = Path("/tmp/phoenix/pids")
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def get_running_pid() -> Optional[int]:
     for file in get_pids_path().iterdir():
-        if file.name.isnumeric():
+        if file.is_file() and file.name.isdigit():
             return int(file.name)
     return None
 
