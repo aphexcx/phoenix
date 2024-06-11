@@ -88,8 +88,8 @@ def get_working_dir() -> Path:
     working_dir_str = os.getenv(ENV_PHOENIX_WORKING_DIR)
     if working_dir_str is not None:
         return Path(working_dir_str)
-    # Fall back to ~/.phoenix if PHOENIX_WORKING_DIR is not set
-    return Path.home().resolve() / ".phoenix"
+    # Use a cached resolved path for the home directory
+    return Path.home() / ".phoenix"
 
 
 PHOENIX_DIR = Path(__file__).resolve().parent
