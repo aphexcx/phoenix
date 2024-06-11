@@ -60,8 +60,8 @@ def server_instrumentation_is_enabled() -> bool:
 
 
 def _get_temp_path() -> Path:
-    """Get path to  directory in which to store temp phoenix server files."""
-    return Path(tempfile.gettempdir()) / ".arize-phoenix"
+    """Get path to directory in which to store temp phoenix server files."""
+    return Path(tempfile.gettempdir(), ".arize-phoenix")
 
 
 def get_pids_path() -> Path:
