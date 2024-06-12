@@ -190,7 +190,7 @@ def get_env_host_root_path() -> str:
     return os.getenv(ENV_PHOENIX_HOST_ROOT_PATH) or HOST_ROOT_PATH
 
 
-def get_env_collector_endpoint() -> Optional[str]:
+def get_env_collector_endpoint():
     return os.getenv(ENV_PHOENIX_COLLECTOR_ENDPOINT)
 
 
