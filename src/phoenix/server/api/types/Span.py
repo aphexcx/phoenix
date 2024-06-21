@@ -1,3 +1,4 @@
+from typing import Any, Mapping
 import json
 from datetime import datetime
 from enum import Enum
@@ -70,7 +71,11 @@ class SpanIOValue:
         description="Truncate value up to `chars` characters, appending '...' if truncated.",
     )  # type: ignore
     def truncated_value(self, chars: int = 100) -> str:
-        return f"{self.value[: max(0, chars - 3)]}..." if len(self.value) > chars else self.value
+        return (
+            f"{self.value[: max(0, chars - 3)]}..."
+            if len(self.value) > chars
+            else self.value
+        )
 
 
 @strawberry.enum
@@ -96,7 +101,9 @@ class SpanEvent:
     ) -> "SpanEvent":
         return SpanEvent(
             name=event["name"],
-            message=cast(str, event["attributes"].get(trace_schema.EXCEPTION_MESSAGE) or ""),
+            message=cast(
+                str, event["attributes"].get(trace_schema.EXCEPTION_MESSAGE) or ""
+            ),
             timestamp=datetime.fromisoformat(event["timestamp"]),
         )
 
@@ -160,7 +167,9 @@ class Span(Node):
         "a list, and each evaluation is identified by its document's (zero-based) "
         "index in that list."
     )  # type: ignore
-    async def document_evaluations(self, info: Info[Context, None]) -> List[DocumentEvaluation]:
+    async def document_evaluations(
+        self, info: Info[Context, None]
+    ) -> List[DocumentEvaluation]:
         return await info.context.data_loaders.document_evaluations.load(self.id_attr)
 
     @strawberry.field(
@@ -192,9 +201,13 @@ class Span(Node):
 def to_gql_span(span: models.Span) -> Span:
     events: List[SpanEvent] = list(map(SpanEvent.from_dict, span.events))
     input_value = cast(Optional[str], get_attribute_value(span.attributes, INPUT_VALUE))
-    output_value = cast(Optional[str], get_attribute_value(span.attributes, OUTPUT_VALUE))
+    output_value = cast(
+        Optional[str], get_attribute_value(span.attributes, OUTPUT_VALUE)
+    )
     retrieval_documents = get_attribute_value(span.attributes, RETRIEVAL_DOCUMENTS)
-    num_documents = len(retrieval_documents) if isinstance(retrieval_documents, Sized) else None
+    num_documents = (
+        len(retrieval_documents) if isinstance(retrieval_documents, Sized) else None
+    )
     return Span(
         id_attr=span.id,
         name=span.name,
@@ -209,8 +222,12 @@ def to_gql_span(span: models.Span) -> Span:
             trace_id=cast(ID, span.trace.trace_id),
             span_id=cast(ID, span.span_id),
         ),
-        attributes=json.dumps(_hide_embedding_vectors(span.attributes), cls=_JSONEncoder),
-        metadata=_convert_metadata_to_string(get_attribute_value(span.attributes, METADATA)),
+        attributes=json.dumps(
+            _hide_embedding_vectors(span.attributes), cls=_JSONEncoder
+        ),
+        metadata=_convert_metadata_to_string(
+            get_attribute_value(span.attributes, METADATA)
+        ),
         num_documents=num_documents,
         token_count_total=cast(
             Optional[int],
@@ -236,7 +253,9 @@ def to_gql_span(span: models.Span) -> Span:
         events=events,
         input=(
             SpanIOValue(
-                mime_type=MimeType(get_attribute_value(span.attributes, INPUT_MIME_TYPE)),
+                mime_type=MimeType(
+                    get_attribute_value(span.attributes, INPUT_MIME_TYPE)
+                ),
                 value=input_value,
             )
             if input_value is not None
@@ -244,7 +263,9 @@ def to_gql_span(span: models.Span) -> Span:
         ),
         output=(
             SpanIOValue(
-                mime_type=MimeType(get_attribute_value(span.attributes, OUTPUT_MIME_TYPE)),
+                mime_type=MimeType(
+                    get_attribute_value(span.attributes, OUTPUT_MIME_TYPE)
+                ),
                 value=output_value,
             )
             if output_value is not None
@@ -254,26 +275,34 @@ def to_gql_span(span: models.Span) -> Span:
 
 
 def _hide_embedding_vectors(attributes: Mapping[str, Any]) -> Mapping[str, Any]:
-    if not (
-        isinstance(em := attributes.get("embedding"), dict)
-        and isinstance(embeddings := em.get("embeddings"), list)
-        and embeddings
-    ):
-        return attributes
-    embeddings = embeddings.copy()
-    for i, embedding in enumerate(embeddings):
-        if not (
-            isinstance(embedding, dict)
-            and isinstance(emb := embedding.get("embedding"), dict)
-            and isinstance(vector := emb.get("vector"), list)
-            and vector
-        ):
-            continue
-        embeddings[i] = {
-            **embedding,
-            "embedding": {**emb, "vector": f"<{len(vector)} dimensional vector>"},
-        }
-    return {**attributes, "embedding": {**em, "embeddings": embeddings}}
+    embedding = attributes.get("embedding")
+    if isinstance(embedding, dict):
+        embeddings = embedding.get("embeddings")
+        if isinstance(embeddings, list) and embeddings:
+            new_embeddings = []
+            for emb in embeddings:
+                if isinstance(emb, dict):
+                    embedding_dict = emb.get("embedding")
+                    if isinstance(embedding_dict, dict):
+                        vector = embedding_dict.get("vector")
+                        if isinstance(vector, list) and vector:
+                            new_dict = emb.copy()
+                            new_dict["embedding"] = embedding_dict.copy()
+                            new_dict["embedding"][
+                                "vector"
+                            ] = f"<{len(vector)} dimensional vector>"
+                            new_embeddings.append(new_dict)
+                        else:
+                            new_embeddings.append(emb)
+                    else:
+                        new_embeddings.append(emb)
+                else:
+                    new_embeddings.append(emb)
+            new_attributes = attributes.copy()
+            new_emb = new_attributes["embedding"] = embedding.copy()
+            new_emb["embeddings"] = new_embeddings
+            return new_attributes
+    return attributes
 
 
 class _JSONEncoder(json.JSONEncoder):
